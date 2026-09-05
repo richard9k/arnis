@@ -885,11 +885,8 @@ pub fn generate_highway_tunnel_shell(
         }
     }
 
-    let default_palette: &'static [Block] = match highway_type.as_str() {
-        "footway" | "pedestrian" | "service" | "steps" => &[GRAY_CONCRETE],
-        "path" => &[DIRT_PATH],
-        _ => DEFAULT_ROAD_MIX,
-    };
+    let default_palette: &'static [Block] = DEFAULT_ROAD_MIX;
+
     let palette = get_blocks_for_surface_way(way, default_palette);
     let faces = tunnel_portal_faces(&pts, internal_endpoints);
 
@@ -1451,11 +1448,7 @@ fn generate_highways_internal(
             // Surface palette per highway type; width is resolved by
             // highway_block_range below so renderer and prescan stay in sync.
             match highway_type.as_str() {
-                "footway" | "pedestrian" | "service" | "steps" => {
-                    block_types = &[GRAY_CONCRETE];
-                }
-                "path" => block_types = &[DIRT_PATH],
-                "escape" => block_types = &[SAND], // sand trap for runaway vehicles
+                // Overrides disabled: all roads will now use DEFAULT_ROAD_MIX (Cyan/Gray)
                 _ => {}
             }
 
@@ -1527,7 +1520,7 @@ fn generate_highways_internal(
                 .tags
                 .get("lanes")
                 .and_then(|l| l.parse::<i32>().ok())
-                .unwrap_or_else(|| highway_default_lanes(highway_type))
+                .unwrap_or(2) // Forces at least 2 lanes so every road gets a white divider
                 .clamp(1, MAX_LANES);
             if way.tags.get("lane_markings").map(|s| s.as_str()) == Some("no") {
                 lanes = 1;
@@ -2723,47 +2716,11 @@ pub(crate) fn highway_default_lanes(highway_type: &str) -> i32 {
 /// Canonical road half-width in blocks. Single source of truth shared by the
 /// renderer and the prescan/bitmap/bridge consumers, so they never disagree.
 pub(crate) fn highway_block_range(
-    highway_type: &str,
-    tags: &HashMap<String, String>,
-    scale: f64,
+    _highway_type: &str,
+    _tags: &HashMap<String, String>,
+    _scale: f64,
 ) -> i32 {
-    let (mut block_range, scales_with_lanes): (i32, bool) = match highway_type {
-        "footway" | "pedestrian" => (1, false),
-        "path" => (1, false),
-        "motorway" | "primary" | "trunk" => (5, true),
-        "secondary" => (4, true),
-        "tertiary" => (2, true),
-        "track" => (1, false),
-        "service" => (2, true),
-        "secondary_link" | "tertiary_link" => (1, true),
-        "escape" => (1, false),
-        "steps" => (1, false),
-        _ => (2, true),
-    };
-
-    const MAX_LANES: i32 = 16;
-    let lanes = tags
-        .get("lanes")
-        .and_then(|l| l.parse::<i32>().ok())
-        .unwrap_or_else(|| highway_default_lanes(highway_type))
-        .clamp(1, MAX_LANES);
-
-    // Explicit width=* wins; else vehicular roads use 3.5 m/lane, never below
-    // the default. The -1 accounts for the centre block in 2*block_range+1.
-    if let Some(w) = parse_width_tag_m(tags) {
-        block_range = (w / 2.0).round() as i32;
-    } else if scales_with_lanes {
-        let lanes_based = ((lanes as f32 * 3.5 - 1.0) / 2.0).round() as i32;
-        block_range = block_range.max(lanes_based);
-    }
-    block_range = block_range.clamp(1, MAX_BLOCK_RANGE as i32);
-
-    if scale < 1.0 {
-        // max(1): scaling must never collapse a road to zero width.
-        block_range = (((block_range as f64) * scale).floor() as i32).max(1);
-    }
-
-    block_range
+    6 // This forces every road to be 13 blocks wide (2 * 6 + 1)
 }
 
 /// Collect all (x, z) coordinates that are covered by any rendered road or path
