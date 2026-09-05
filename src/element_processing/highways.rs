@@ -1448,7 +1448,7 @@ fn generate_highways_internal(
             // Surface palette per highway type; width is resolved by
             // highway_block_range below so renderer and prescan stay in sync.
             match highway_type.as_str() {
-                // Overrides disabled: all roads will now use DEFAULT_ROAD_MIX (Cyan/Gray)
+                // Overrides disabled: all roads will now use DEFAULT_ROAD_MIX (Cyan/Gray) 
                 _ => {}
             }
 
