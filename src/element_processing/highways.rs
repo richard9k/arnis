@@ -1478,13 +1478,7 @@ fn generate_highways_internal(
             // all road types; for single-block surfaces like concrete or sand
             // the mix degenerates to that one block, so `semirandom_surface`
             // always returns the same value.
-            if let Some(blocks) = element
-                .tags()
-                .get("surface")
-                .and_then(|s| get_blocks_for_surface(s))
-            {
-                block_types = blocks;
-            }
+            
 
             // Pedestrian walkways tagged with a paved surface render as
             // smooth stone, overriding the `surface=*` palette. Real-world
@@ -1891,7 +1885,7 @@ fn generate_highways_internal(
                                         // bar only replaces zebra background.
                                         if use_absolute_y {
                                             editor.set_block_absolute(
-                                                WHITE_CONCRETE,
+                                                YELLOW_CONCRETE,
                                                 set_x,
                                                 cell_y,
                                                 set_z,
@@ -1900,7 +1894,7 @@ fn generate_highways_internal(
                                             );
                                         } else {
                                             editor.set_block(
-                                                WHITE_CONCRETE,
+                                                YELLOW_CONCRETE,
                                                 set_x,
                                                 cell_y,
                                                 set_z,
