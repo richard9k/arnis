@@ -1181,6 +1181,23 @@ fn raise_superflat_floor(root: &mut Value, base_y: i32, min_y: i32) {
         return;
     };
 
+    let stone_height = base_y - min_y - 11;
+    if stone_height > 0 {
+        let layer = |block: &str, height: i32| {
+            Value::Compound(std::collections::HashMap::from([
+                ("block".to_string(), Value::String(block.to_string())),
+                ("height".to_string(), Value::Int(height)),
+            ]))
+        };
+        *layers = vec![
+            layer("minecraft:bedrock", 1),
+            layer("minecraft:stone", stone_height),
+            layer("minecraft:dirt", 10),
+            layer("minecraft:grass_block", 1),
+        ];
+        return;
+    }
+
     match layers.first_mut() {
         Some(Value::Compound(bottom)) if matches!(bottom.get("block"), Some(Value::String(b)) if b == "minecraft:air") =>
         {
