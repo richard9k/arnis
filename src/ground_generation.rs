@@ -509,7 +509,51 @@ pub fn generate_ground_region(
                     } else {
                         args.ground_level
                     };
+// Clamped flat floor around the mountain: write exact Superflat layers
+                    // (bedrock at floor, stone up to ground-11, 10 dirt, grass_block at ground)
+                    // and skip desert surface/plant generation.
+                    if terrain_enabled && ground_y <= args.ground_level {
+                        let floor_y = terrain_floor_y();
+                        let stone_top = ground_y - 11;
+                        if column_fill_y_min <= stone_top {
+                            editor.fill_column_absolute(
+                                STONE,
+                                x,
+                                z,
+                                column_fill_y_min.max(floor_y + 1),
+                                stone_top,
+                                true,
+                            );
+                        }
+                        if ground_y - 1 > floor_y {
+                            let dirt_min = (ground_y - 10).max(floor_y + 1);
+                            editor.fill_column_absolute(
+                                DIRT,
+                                x,
+                                z,
+                                dirt_min,
+                                ground_y - 1,
+                                false,
+                            );
+                        }
+                        editor.set_block_absolute(GRASS_BLOCK, x, ground_y, z, None, None);
+                        editor.set_block_absolute(BEDROCK, x, floor_y, z, None, Some(&[BEDROCK]));
 
+                        water_memo.forget(x, z);
+                        block_counter += 1;
+                        #[allow(clippy::manual_is_multiple_of)]
+                        if block_counter % batch_size == 0 {
+                            ground_pb.inc(batch_size);
+                        }
+                        if show_progress {
+                            gui_progress_grnd += progress_increment_grnd;
+                            if (gui_progress_grnd - last_emitted_progress).abs() > 0.25 {
+                                emit_gui_progress_update(gui_progress_grnd, "");
+                                last_emitted_progress = gui_progress_grnd;
+                            }
+                        }
+                        continue;
+                    }
                     let coord = XZPoint::new(x - xzbbox.min_x(), z - xzbbox.min_z());
                     let climate = ground.climate_at(coord);
                     // Slope once per column (used for surface selection and depth), from
