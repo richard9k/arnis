@@ -26,28 +26,42 @@ pub(crate) const DATA_VERSION: i32 = 3955;
 /// Keyed by that base: it sinks when the relief needs the extended floor, and a GUI process
 /// can generate several worlds in a row, so a plain OnceLock would go stale.
 /// Cached filler-chunk sections, keyed by the base Y and block they came from.
-type BaseChunkCache = Option<(i32, Block, Arc<Vec<Section>>)>;
+type BaseChunkCache = Option<(i32, i32, Block, Arc<Vec<Section>>)>;
 
 static BASE_CHUNK_SECTIONS: Mutex<BaseChunkCache> = Mutex::new(None);
 
 /// Get or create the cached base chunk sections for the current terrain base.
 fn get_base_chunk_sections() -> Arc<Vec<Section>> {
+    use crate::block_definitions::{BEDROCK, DIRT, STONE};
+
     let base_y = crate::world_editor::base_chunk_y();
+    let min_y = crate::world_editor::min_y();
     let block = crate::world_editor::base_chunk_block();
     let mut cache = BASE_CHUNK_SECTIONS.lock().unwrap();
-    if let Some((cached_y, cached_block, ref sections)) = *cache {
-        if cached_y == base_y && cached_block == block {
+    if let Some((cached_y, cached_min_y, cached_block, ref sections)) = *cache {
+        if cached_y == base_y && cached_min_y == min_y && cached_block == block {
             return Arc::clone(sections);
         }
     }
     let mut chunk = ChunkToModify::default();
+    let stone_top = base_y - 11;
+    let dirt_min = (base_y - 10).max(min_y + 1);
     for x in 0..16 {
         for z in 0..16 {
+            chunk.set_block(x, min_y, z, BEDROCK);
+            if base_y - min_y >= 12 {
+                for y in (min_y + 1)..=stone_top {
+                    chunk.set_block(x, y, z, STONE);
+                }
+                for y in dirt_min..base_y {
+                    chunk.set_block(x, y, z, DIRT);
+                }
+            }
             chunk.set_block(x, base_y, z, block);
         }
     }
     let sections = Arc::new(chunk.sections().collect::<Vec<Section>>());
-    *cache = Some((base_y, block, Arc::clone(&sections)));
+    *cache = Some((base_y, min_y, block, Arc::clone(&sections)));
     sections
 }
 
