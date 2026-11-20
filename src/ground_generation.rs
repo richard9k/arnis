@@ -513,7 +513,7 @@ pub fn generate_ground_region(
                     // (bedrock at floor, stone up to ground-11, 10 dirt, grass_block at ground)
                     // and skip desert surface/plant generation.
                     if terrain_enabled && ground_y <= args.ground_level {
-                        let floor_y = terrain_floor_y();
+                        let floor_y = min_y();
                         let stone_top = ground_y - 11;
                         if column_fill_y_min <= stone_top {
                             editor.fill_column_absolute(
