@@ -2729,21 +2729,110 @@ pub fn scale_to_minecraft(
     disable_height_limit: bool,
     extended_max_y: i32,
 ) -> (Vec<Vec<f64>>, f64, f64, i32) {
-    let (heights, affine) = scale_to_minecraft_with(
-        blurred_heights,
-        scale,
-        ground_level,
-        min_ground_level,
-        disable_height_limit,
-        extended_max_y,
-        AffinePolicy::Fit,
-    );
-    (
-        heights,
-        affine.min_height_m,
-        affine.blocks_per_meter,
-        affine.ground_level,
-    )
+    // Clamp everything below 530m up to a flat 530m floor
+    const FLAT_BASE_M: f64 = 530.0;
+    let clamp_floor = |h: f64| if h.is_finite() { h.max(FLAT_BASE_M) } else { h };
+
+    // Derive min/max
+    let (min_height, max_height) = blurred_heights
+        .par_iter()
+        .map(|row| {
+            let mut lo = f64::MAX;
+            let mut hi = f64::MIN;
+            for &raw_h in row {
+                let h = clamp_floor(raw_h);
+                if h.is_finite() {
+                    lo = lo.min(h);
+                    hi = hi.max(h);
+                }
+            }
+            (lo, hi)
+        })
+        .reduce(
+            || (f64::MAX, f64::MIN),
+            |(lo1, hi1), (lo2, hi2)| (lo1.min(lo2), hi1.max(hi2)),
+        );
+
+    let (min_height, height_range) =
+        if !min_height.is_finite() || !max_height.is_finite() || min_height >= max_height {
+            let real_min = if min_height.is_finite() && min_height <= max_height {
+                min_height
+            } else {
+                0.0
+            };
+            (real_min, 0.0_f64)
+        } else {
+            (min_height, max_height - min_height)
+        };
+
+    let effective_max_y = if disable_height_limit {
+        extended_max_y
+    } else {
+        MAX_Y
+    };
+    let upper_clamp = (effective_max_y - TERRAIN_HEIGHT_BUFFER) as f64;
+
+    let ideal_scaled_range: f64 = height_range * scale;
+    let ceiling = effective_max_y - TERRAIN_HEIGHT_BUFFER;
+
+    // Because you pass `--ground-level 100`, `min_ground_level == ground_level`,
+    // so `ground_level` stays 100 and is NOT sunk down.
+    let ground_level = if disable_height_limit
+        && min_ground_level < ground_level
+        && ideal_scaled_range.is_finite()
+    {
+        let needed = ideal_scaled_range.ceil() as i32;
+        (ceiling.saturating_sub(needed)).clamp(min_ground_level, ground_level)
+    } else {
+        ground_level
+    };
+
+    let available_y_range: f64 = (ceiling - ground_level) as f64;
+
+    let scaled_range: f64 = if ideal_scaled_range <= available_y_range {
+        eprintln!(
+            "Realistic elevation: {:.1}m range fits in {} available blocks",
+            height_range, available_y_range as i32
+        );
+        ideal_scaled_range
+    } else {
+        let compression_factor: f64 = available_y_range / height_range;
+        let compressed_range: f64 = height_range * compression_factor;
+        eprintln!(
+            "Elevation compressed: {:.1}m range -> {:.0} blocks ({:.2}:1 ratio, 1 block = {:.2}m)",
+            height_range,
+            compressed_range,
+            height_range / compressed_range,
+            compressed_range / height_range
+        );
+        compressed_range
+    };
+
+    let mc_heights: Vec<Vec<f64>> = blurred_heights
+        .par_iter()
+        .map(|row| {
+            row.iter()
+                .map(|&raw_h| {
+                    let h = clamp_floor(raw_h);
+                    let relative_height: f64 = if height_range > 0.0 {
+                        (h - min_height) / height_range
+                    } else {
+                        0.0
+                    };
+                    let scaled_height: f64 = relative_height * scaled_range;
+                    let mc_y = ground_level as f64 + scaled_height;
+                    mc_y.clamp(ground_level as f64, upper_clamp)
+                })
+                .collect()
+        })
+        .collect();
+
+    let blocks_per_meter = if height_range > 0.0 {
+        scaled_range / height_range
+    } else {
+        0.0
+    };
+    (mc_heights, min_height, blocks_per_meter, ground_level)
 }
 
 /// `y = ground_level + (h_m - min_height_m) * blocks_per_meter`, bent above
@@ -3189,6 +3278,16 @@ pub fn scale_to_minecraft_in_place(
     policy: AffinePolicy,
     top_reserve: i32,
 ) -> ElevationAffine {
+    // Clamp everything below 530m up to a flat 530m floor
+    const FLAT_BASE_M: f64 = 530.0;
+    heights.par_iter_mut().for_each(|row| {
+        for h in row.iter_mut() {
+            if h.is_finite() && *h < FLAT_BASE_M {
+                *h = FLAT_BASE_M;
+            }
+        }
+    });
+
     let blurred_heights: &[Vec<f64>] = heights;
     let ceiling = terrain_ceiling(disable_height_limit, extended_max_y);
     let upper_clamp = ceiling as f64;
