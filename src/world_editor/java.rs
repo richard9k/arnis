@@ -92,10 +92,15 @@ impl<'a> WorldEditor<'a> {
         // Compute region bounds from original bbox to skip halo regions.
         // A region at (rx, rz) covers blocks [rx*512 .. rx*512+511] × [rz*512 .. rz*512+511].
         let bounds = self.write_bounds();
-        let min_region_x = bounds.min_x().div_euclid(512);
-        let max_region_x = bounds.max_x().div_euclid(512);
-        let min_region_z = bounds.min_z().div_euclid(512);
-        let max_region_z = bounds.max_z().div_euclid(512);
+        let b_min_x = bounds.min_x();
+        let b_max_x = bounds.max_x();
+        let b_min_z = bounds.min_z();
+        let b_max_z = bounds.max_z();
+        let min_region_x = b_min_x.div_euclid(512);
+        let max_region_x = b_max_x.div_euclid(512);
+        let min_region_z = b_min_z.div_euclid(512);
+        let max_region_z = b_max_z.div_euclid(512);
+
         if !self.void_world {
             use crate::block_definitions::{BEDROCK, DIRT, GRASS_BLOCK, STONE};
             let base_y = crate::world_editor::base_chunk_y();
@@ -115,10 +120,10 @@ impl<'a> WorldEditor<'a> {
                     }
                     let abs_bx = (*rx * 32 + cx) * 16;
                     let abs_bz = (*rz * 32 + cz) * 16;
-                    if abs_bx >= bounds.min_x()
-                        && abs_bx + 15 <= bounds.max_x()
-                        && abs_bz >= bounds.min_z()
-                        && abs_bz + 15 <= bounds.max_z()
+                    if abs_bx >= b_min_x
+                        && abs_bx + 15 <= b_max_x
+                        && abs_bz >= b_min_z
+                        && abs_bz + 15 <= b_max_z
                     {
                         continue;
                     }
@@ -126,10 +131,10 @@ impl<'a> WorldEditor<'a> {
                         for lz in 0..16u8 {
                             let wx = abs_bx + i32::from(lx);
                             let wz = abs_bz + i32::from(lz);
-                            if wx >= bounds.min_x()
-                                && wx <= bounds.max_x()
-                                && wz >= bounds.min_z()
-                                && wz <= bounds.max_z()
+                            if wx >= b_min_x
+                                && wx <= b_max_x
+                                && wz >= b_min_z
+                                && wz <= b_max_z
                             {
                                 continue;
                             }
@@ -151,6 +156,7 @@ impl<'a> WorldEditor<'a> {
                 }
             });
         }
+
         let total_regions = self
             .world
             .regions
@@ -229,7 +235,6 @@ impl<'a> WorldEditor<'a> {
 
         Ok(())
     }
-
     /// Saves a single region to disk.
     ///
     /// Optimized for new world creation, writes chunks directly without reading existing data.
