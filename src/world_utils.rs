@@ -1195,6 +1195,13 @@ fn raise_superflat_floor(root: &mut Value, base_y: i32, min_y: i32) {
             layer("minecraft:dirt", 10),
             layer("minecraft:grass_block", 1),
         ];
+        flat.insert(
+            "biome".to_string(),
+            Value::String("minecraft:savanna".to_string()),
+        );
+        flat.insert("features".to_string(), Value::Byte(0));
+        flat.insert("lakes".to_string(), Value::Byte(0));
+        flat.insert("structure_overrides".to_string(), Value::List(Vec::new()));
         return;
     }
 
