@@ -96,7 +96,61 @@ impl<'a> WorldEditor<'a> {
         let max_region_x = bounds.max_x().div_euclid(512);
         let min_region_z = bounds.min_z().div_euclid(512);
         let max_region_z = bounds.max_z().div_euclid(512);
+        if !self.void_world {
+            use crate::block_definitions::{BEDROCK, DIRT, GRASS_BLOCK, STONE};
+            let base_y = crate::world_editor::base_chunk_y();
+            let min_y = crate::world_editor::min_y();
 
+            self.world.regions.par_iter_mut().for_each(|((rx, rz), region)| {
+                if *rx < min_region_x
+                    || *rx > max_region_x
+                    || *rz < min_region_z
+                    || *rz > max_region_z
+                {
+                    return;
+                }
+                for (&(cx, cz), chunk) in region.chunks.iter_mut() {
+                    if chunk.sections.is_empty() && chunk.other.is_empty() {
+                        continue;
+                    }
+                    let abs_bx = (*rx * 32 + cx as i32) * 16;
+                    let abs_bz = (*rz * 32 + cz as i32) * 16;
+                    if abs_bx >= bounds.min_x()
+                        && abs_bx + 15 <= bounds.max_x()
+                        && abs_bz >= bounds.min_z()
+                        && abs_bz + 15 <= bounds.max_z()
+                    {
+                        continue;
+                    }
+                    for lx in 0..16u8 {
+                        for lz in 0..16u8 {
+                            let wx = abs_bx + i32::from(lx);
+                            let wz = abs_bz + i32::from(lz);
+                            if wx >= bounds.min_x()
+                                && wx <= bounds.max_x()
+                                && wz >= bounds.min_z()
+                                && wz <= bounds.max_z()
+                            {
+                                continue;
+                            }
+                            if chunk.get_block(lx, base_y, lz).is_some() {
+                                continue;
+                            }
+                            chunk.set_block(lx, min_y, lz, BEDROCK);
+                            if base_y - min_y >= 12 {
+                                for y in (min_y + 1)..=(base_y - 11) {
+                                    chunk.set_block(lx, y, lz, STONE);
+                                }
+                                for y in (base_y - 10)..base_y {
+                                    chunk.set_block(lx, y, lz, DIRT);
+                                }
+                            }
+                            chunk.set_block(lx, base_y, lz, GRASS_BLOCK);
+                        }
+                    }
+                }
+            });
+        }
         let total_regions = self
             .world
             .regions
