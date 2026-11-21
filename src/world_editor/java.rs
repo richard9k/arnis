@@ -109,12 +109,12 @@ impl<'a> WorldEditor<'a> {
                 {
                     return;
                 }
-                for (&(cx, cz), chunk) in region.chunks.iter_mut() {
+                for ((cx, cz), chunk) in region.chunks.iter_mut() {
                     if chunk.sections.is_empty() && chunk.other.is_empty() {
                         continue;
                     }
-                    let abs_bx = (*rx * 32 + cx as i32) * 16;
-                    let abs_bz = (*rz * 32 + cz as i32) * 16;
+                    let abs_bx = (*rx * 32 + cx) * 16;
+                    let abs_bz = (*rz * 32 + cz) * 16;
                     if abs_bx >= bounds.min_x()
                         && abs_bx + 15 <= bounds.max_x()
                         && abs_bz >= bounds.min_z()
